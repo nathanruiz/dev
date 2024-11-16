@@ -1,0 +1,2 @@
+.env.age diff=age merge=age
+.env.age.* diff=age merge=age
