@@ -16,6 +16,11 @@ pub struct Cli {
     pub command: Commands,
 }
 
+trait Runnable {
+    fn run(&self, environment: &str) -> Result<()>;
+}
+
+// dev ...
 #[derive(Subcommand)]
 pub enum Commands {
     Run(RunCommand),
@@ -27,11 +32,18 @@ pub enum Commands {
     },
 }
 
-trait Runnable {
-    fn run(&self, environment: &str) -> Result<()>;
+impl Runnable for Commands {
+    fn run(&self, environment: &str) -> Result<()> {
+        match self {
+            Self::Run(cmd) => cmd.run(environment),
+            Self::Config { command } => command.run(environment),
+            Self::Start(cmd) => cmd.run(environment),
+            Self::Init(cmd) => cmd.run(environment),
+        }
+    }
 }
 
-/// dev run <command> [args]
+// dev run <command> [args]
 #[derive(Args)]
 pub struct RunCommand {
     command: String,
@@ -46,7 +58,7 @@ impl Runnable for RunCommand {
     }
 }
 
-/// dev start
+// dev start
 #[derive(Args)]
 pub struct StartCommand;
 
@@ -56,7 +68,7 @@ impl Runnable for StartCommand {
     }
 }
 
-/// dev init
+// dev init
 #[derive(Args)]
 pub struct InitCommand;
 
@@ -66,44 +78,34 @@ impl Runnable for InitCommand {
     }
 }
 
+// dev config ...
+#[derive(Subcommand)]
+pub enum ConfigCommands {
+    Export(ConfigExportCommand),
+    Edit(ConfigEditCommand),
+}
 
-impl Commands {
-    pub fn run(&self, environment: &str) -> Result<()> {
+impl Runnable for ConfigCommands {
+    fn run(&self, environment: &str) -> Result<()> {
         match self {
-            Self::Run(cmd) => cmd.run(environment),
-            Self::Config { command } => command.run(environment),
-            Self::Start(cmd) => cmd.run(environment),
-            Self::Init(cmd) => cmd.run(environment),
+            Self::Export(cmd) => cmd.run(environment),
+            Self::Edit(cmd) => cmd.run(environment),
         }
     }
 }
 
-#[derive(Subcommand)]
-pub enum ConfigCommands {
-    Export {
-        #[arg(short, long, value_enum, default_value_t = ConfigExportFormat::Raw)]
-        format: ConfigExportFormat,
-    },
-    Edit {},
+// dev config export ...
+#[derive(Args)]
+struct ConfigExportCommand {
+    #[arg(short, long, value_enum, default_value_t = ConfigExportFormat::Raw)]
+    format: ConfigExportFormat,
 }
 
-impl ConfigCommands {
+impl Runnable for ConfigExportCommand {
     fn run(&self, environment: &str) -> Result<()> {
-        match self {
-            Self::Export { format } => {
-                self.export_command(environment, *format)?;
-            },
-            Self::Edit { } => {
-                self.edit_command(environment)?;
-            },
-        };
-        Ok(())
-    }
-
-    fn export_command(&self, environment: &str, format: ConfigExportFormat) -> Result<()> {
         let repo = Repo::new()?;
         let env = repo.get_environment(environment.into());
-        match format {
+        match self.format {
             ConfigExportFormat::Raw => {
                 let mut file = env.decrypt()?;
                 std::io::copy(&mut file, &mut std::io::stdout()).unwrap();
@@ -130,12 +132,17 @@ impl ConfigCommands {
         };
         Ok(())
     }
+}
 
-    fn edit_command(&self, environment: &str) -> Result<()> {
+// dev config edit ...
+#[derive(Args)]
+struct ConfigEditCommand;
+
+impl ConfigCommands {
+    fn run(&self, environment: &str) -> Result<()> {
         let repo = Repo::new()?;
         let env = repo.get_environment(environment.into());
-        env.edit()?;
-        Ok(())
+        env.edit()
     }
 }
 
