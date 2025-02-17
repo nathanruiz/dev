@@ -1,7 +1,6 @@
 mod error;
 mod cli;
 
-use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::os::unix::process::CommandExt;
@@ -15,18 +14,15 @@ use tempfile::NamedTempFile;
 use error::*;
 use cli::*;
 
-
-struct EnvironmentConfig {
-    env_path: PathBuf,
+struct Repo {
     home: String,
     repo_path: PathBuf,
 }
 
-impl EnvironmentConfig {
-    pub fn from_env(environment: &str) -> Result<Self> {
+impl Repo {
+    pub fn new() -> Result<Self> {
         let repo_path = Self::get_repo_path()?;
         Ok(Self {
-            env_path: Self::path_from_env(environment, &repo_path),
             home: std::env::var("HOME").unwrap(),
             repo_path,
         })
@@ -49,25 +45,41 @@ impl EnvironmentConfig {
         Ok(path.trim().into())
     }
 
-    fn path_from_env(environment: &str, repo_path: &Path) -> PathBuf {
-        let name = format!(".dev/env.age.{}", environment);
-        repo_path.join(name)
-    }
-
     fn keys_path(&self) -> PathBuf {
         self.repo_path.join(".dev/developers")
     }
 
+    pub fn get_environment<'a>(&'a self, name: String) -> Environment<'a> {
+        Environment {
+            name,
+            repo: self,
+        }
+    }
+
+}
+
+struct Environment<'a> {
+    name: String,
+    repo: &'a Repo,
+}
+
+impl Environment<'_> {
+    fn path(&self) -> PathBuf {
+        let name = format!(".dev/env.age.{}", self.name);
+        self.repo.repo_path.join(name)
+    }
+
     pub fn decrypt(&self) -> Result<NamedTempFile> {
-        let name = self.env_path.file_name().unwrap();
+        let env_path = self.path();
+        let name = env_path.file_name().unwrap();
         let file = NamedTempFile::with_suffix(name).unwrap();
 
-        if std::fs::exists(&self.env_path).unwrap() {
+        if std::fs::exists(&env_path).unwrap() {
             let output = Command::new("age")
                 .args(["-d"])
-                .args(["-i", &format!("{}/.ssh/id_ed25519", self.home)])
+                .args(["-i", &format!("{}/.ssh/id_ed25519", self.repo.home)])
                 .args(["-o", file.path().to_str().unwrap()])
-                .args(["--", self.env_path.to_str().unwrap()])
+                .args(["--", env_path.to_str().unwrap()])
                 .output()
                 .map_err(|e| AppError::AgeDecryptError(CommandError::SpawnError(e)))?;
 
@@ -85,8 +97,8 @@ impl EnvironmentConfig {
     pub fn encrypt(&self, file: &NamedTempFile) -> Result<()> {
         let output = Command::new("age")
             .args(["-e", "-a"])
-            .args(["-R", self.keys_path().to_str().unwrap()])
-            .args(["-o", self.env_path.to_str().unwrap()])
+            .args(["-R", self.repo.keys_path().to_str().unwrap()])
+            .args(["-o", self.path().to_str().unwrap()])
             .args(["--", file.path().to_str().unwrap()])
             .output()
             .map_err(|e| AppError::AgeEncryptError(CommandError::SpawnError(e)))?;

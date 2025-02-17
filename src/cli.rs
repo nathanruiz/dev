@@ -59,7 +59,8 @@ impl Commands {
             process.arg(arg);
         }
 
-        let config = EnvironmentConfig::from_env(environment)?;
+        let repo = Repo::new()?;
+        let config = repo.get_environment(environment.into());
         for (key, value) in config.values()? {
             match value {
                 Value::String(value) => process.env(key, value),
@@ -102,7 +103,8 @@ impl ConfigCommands {
     }
 
     fn export_command(&self, environment: &str, format: ConfigExportFormat) -> Result<()> {
-        let env = EnvironmentConfig::from_env(environment)?;
+        let repo = Repo::new()?;
+        let env = repo.get_environment(environment.into());
         match format {
             ConfigExportFormat::Raw => {
                 let mut file = env.decrypt()?;
@@ -132,7 +134,8 @@ impl ConfigCommands {
     }
 
     fn edit_command(&self, environment: &str) -> Result<()> {
-        let env = EnvironmentConfig::from_env(environment)?;
+        let repo = Repo::new()?;
+        let env = repo.get_environment(environment.into());
         env.edit()?;
         Ok(())
     }
