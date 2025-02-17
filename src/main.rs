@@ -214,7 +214,7 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
 
     struct TestSetup {
         _temp_dir: TempDir,
-        env_config: EnvironmentConfig,
+        repo: Repo,
     }
 
     impl TestSetup {
@@ -235,23 +235,24 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
             std::fs::write(path.join(".ssh/id_ed25519.pub"), PUBLIC_KEY.trim()).unwrap();
             std::fs::write(path.join(".ssh/id_ed25519"), PRIVATE_KEY.trim()).unwrap();
 
-            let env_path = path.join(".dev/env.age.local");
-
             Self {
                 _temp_dir: temp_dir,
-                env_config: EnvironmentConfig {
-                    env_path,
+                repo: Repo {
                     home: path.to_str().unwrap().into(),
                     repo_path: path.into(),
                 },
             }
+        }
+
+        fn env(&self) -> Environment {
+            self.repo.get_environment("local".into())
         }
     }
 
     #[test]
     fn test_get_repo_path_success() {
         TestSetup::new();
-        EnvironmentConfig::get_repo_path().unwrap();
+        Repo::get_repo_path().unwrap();
     }
 
     #[test]
@@ -261,17 +262,17 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
         // Encrypt "test content"
         let mut file = NamedTempFile::new().unwrap();
         writeln!(file, "test content").unwrap();
-        setup.env_config.encrypt(&file).unwrap();
+        setup.env().encrypt(&file).unwrap();
 
         // Decrypt the encrypted file
-        let file = setup.env_config.decrypt().unwrap();
+        let file = setup.env().decrypt().unwrap();
         let content = fs::read_to_string(file.path()).unwrap();
 
         // Decrypted content should be the same as the original content
         assert_eq!(content, "test content\n");
 
         // Encrypted file should not contain the original content
-        let content = fs::read_to_string(&setup.env_config.env_path).unwrap();
+        let content = fs::read_to_string(&setup.env().path()).unwrap();
         assert!(!content.contains("test content"));
     }
 
@@ -281,7 +282,7 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
         let mut file = NamedTempFile::new().unwrap();
         writeln!(file, "test content").unwrap();
 
-        let checksum = setup.env_config.calculate_checksum(&file).unwrap();
+        let checksum = setup.env().calculate_checksum(&file).unwrap();
         assert_eq!(checksum, "a1fff0ffefb9eace7230c24e50731f0a91c62f9cefdfe77121c2f607125dffae");
     }
 
@@ -291,7 +292,7 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
         let file = NamedTempFile::new().unwrap();
 
         env::set_var("EDITOR", "true");
-        setup.env_config.run_editor(&file).unwrap();
+        setup.env().run_editor(&file).unwrap();
     }
 
     #[test]
@@ -300,7 +301,7 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
         let file = NamedTempFile::new().unwrap();
 
         env::set_var("EDITOR", "false");
-        let result = setup.env_config.run_editor(&file);
+        let result = setup.env().run_editor(&file);
 
         assert!(result.is_err());
         if let Err(AppError::EditorError(CommandError::FailedError { status, .. })) = result {
