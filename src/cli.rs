@@ -10,19 +10,27 @@ use crate::*;
 #[command(version, about, long_about = None)]
 pub struct Cli {
     #[arg(global = true, short, long, default_value = "local")]
-    pub environment: String,
+    environment: String,
 
     #[command(subcommand)]
-    pub command: Commands,
+    command: Commands,
+}
+
+impl Cli {
+    pub fn run(&self) -> Result<()> {
+        let repo = Repo::new()?;
+        let environment = repo.get_environment(self.environment.clone());
+        (&self.command).run(&repo, &environment)
+    }
 }
 
 trait Runnable {
-    fn run(&self, environment: &str) -> Result<()>;
+    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()>;
 }
 
 // dev ...
 #[derive(Subcommand)]
-pub enum Commands {
+enum Commands {
     Run(RunCommand),
     Start(StartCommand),
     Init(InitCommand),
@@ -32,64 +40,66 @@ pub enum Commands {
     },
 }
 
-impl Runnable for Commands {
-    fn run(&self, environment: &str) -> Result<()> {
+impl Runnable for &Commands {
+    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
         match self {
-            Self::Run(cmd) => cmd.run(environment),
-            Self::Config { command } => command.run(environment),
-            Self::Start(cmd) => cmd.run(environment),
-            Self::Init(cmd) => cmd.run(environment),
+            Commands::Run(cmd) => cmd.run(repo, environment),
+            Commands::Config { command } => command.run(repo, environment),
+            Commands::Start(cmd) => cmd.run(repo, environment),
+            Commands::Init(cmd) => cmd.run(repo, environment),
         }
     }
 }
 
 // dev run <command> [args]
 #[derive(Args)]
-pub struct RunCommand {
+struct RunCommand {
     command: String,
     #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = true)]
     args: Vec<String>,
 }
 
-impl Runnable for RunCommand {
-    fn run(&self, environment: &str) -> Result<()> {
-        let args = self.args.iter().map(String::as_str).collect();
-        run_command(environment, self.command.as_str(), args)
+impl Runnable for &RunCommand {
+    fn run<'a>(self, _repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+        let args = self.args.iter()
+            .map(String::as_str)
+            .collect();
+        environment.exec(self.command.as_str(), args)
     }
 }
 
 // dev start
 #[derive(Args)]
-pub struct StartCommand;
+struct StartCommand;
 
-impl Runnable for StartCommand {
-    fn run(&self, environment: &str) -> Result<()> {
-        run_command(environment, "nix", vec!["run", ".#dev.start"])
+impl Runnable for &StartCommand {
+    fn run<'a>(self, _repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+        environment.exec("nix", vec!["run", ".#dev.start"])
     }
 }
 
 // dev init
 #[derive(Args)]
-pub struct InitCommand;
+struct InitCommand;
 
-impl Runnable for InitCommand {
-    fn run(&self, _environment: &str) -> Result<()> {
+impl Runnable for &InitCommand {
+    fn run<'a>(self, _repo: &Repo, _environment: &Environment<'a>) -> Result<()> {
         todo!()
     }
 }
 
 // dev config ...
 #[derive(Subcommand)]
-pub enum ConfigCommands {
+enum ConfigCommands {
     Export(ConfigExportCommand),
     Edit(ConfigEditCommand),
 }
 
-impl Runnable for ConfigCommands {
-    fn run(&self, environment: &str) -> Result<()> {
+impl Runnable for &ConfigCommands {
+    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
         match self {
-            Self::Export(cmd) => cmd.run(environment),
-            Self::Edit(cmd) => cmd.run(environment),
+            ConfigCommands::Export(cmd) => cmd.run(repo, environment),
+            ConfigCommands::Edit(cmd) => cmd.run(repo, environment),
         }
     }
 }
@@ -101,22 +111,20 @@ struct ConfigExportCommand {
     format: ConfigExportFormat,
 }
 
-impl Runnable for ConfigExportCommand {
-    fn run(&self, environment: &str) -> Result<()> {
-        let repo = Repo::new()?;
-        let env = repo.get_environment(environment.into());
+impl Runnable for &ConfigExportCommand {
+    fn run<'a>(self, _repo: &Repo, environment: &Environment<'a>) -> Result<()> {
         match self.format {
             ConfigExportFormat::Raw => {
-                let mut file = env.decrypt()?;
+                let mut file = environment.decrypt()?;
                 std::io::copy(&mut file, &mut std::io::stdout()).unwrap();
             },
             ConfigExportFormat::Json => {
-                let values = env.values()?;
+                let values = environment.values()?;
                 let json = serde_json::to_string_pretty(&values).unwrap();
                 println!("{}", json);
             },
             ConfigExportFormat::Docker => {
-                for (key, value) in env.values()? {
+                for (key, value) in environment.values()? {
                     let value = match value {
                         Value::String(value) => value,
                         value => serde_json::to_string(&value).unwrap(),
@@ -138,23 +146,14 @@ impl Runnable for ConfigExportCommand {
 #[derive(Args)]
 struct ConfigEditCommand;
 
-impl ConfigCommands {
-    fn run(&self, environment: &str) -> Result<()> {
-        let repo = Repo::new()?;
-        let env = repo.get_environment(environment.into());
-        env.edit()
+impl Runnable for &ConfigEditCommand {
+    fn run<'a>(self, _repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+        environment.edit()
     }
 }
 
-fn run_command(environment: &str, command: &str, args: Vec<&str>) -> Result<()> {
-    let repo = Repo::new()?;
-    let env = repo.get_environment(environment.into());
-    env.exec(command, args)
-}
-
-
 #[derive(clap::ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub enum ConfigExportFormat {
+enum ConfigExportFormat {
     #[default]
     Raw,
     Json,

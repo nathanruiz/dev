@@ -210,7 +210,7 @@ fn main() {
 
     // You can check for the existence of subcommands, and if found use their
     // matches just as you would the top level cmd.
-    if let Err(e) = cli.command.run(cli.environment.as_str()) {
+    if let Err(e) = cli.run() {
         let arg0 = std::env::args().next().unwrap();
         eprintln!("{}: {}", arg0, e);
         std::process::exit(1);
