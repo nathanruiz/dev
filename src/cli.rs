@@ -6,6 +6,7 @@ use crate::error::*;
 use crate::*;
 
 
+/// The missing tool for 12 factor development environments.
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
@@ -31,9 +32,13 @@ trait Runnable {
 // dev ...
 #[derive(Subcommand)]
 enum Commands {
+    /// Run a command inside a specified environment.
     Run(RunCommand),
+    /// Run the main service(s) for this project.
     Start(StartCommand),
+    /// Initial dev tool files in a git repo.
     Init(InitCommand),
+    /// Interact with environment variables in an environment.
     Config {
         #[command(subcommand)]
         command: ConfigCommands,
@@ -54,8 +59,10 @@ impl Runnable for &Commands {
 // dev run <command> [args]
 #[derive(Args)]
 struct RunCommand {
+    /// The path of the command to execute.
     command: String,
-    #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = true)]
+    /// Any arguments to be passed into the command.
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     args: Vec<String>,
 }
 
@@ -91,7 +98,9 @@ impl Runnable for &InitCommand {
 // dev config ...
 #[derive(Subcommand)]
 enum ConfigCommands {
+    /// Export encrypted environment variables for use by other tools.
     Export(ConfigExportCommand),
+    /// Decrypt and open the environment variable file in your default editor.
     Edit(ConfigEditCommand),
 }
 
