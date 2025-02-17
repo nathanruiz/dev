@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Args};
 
 use toml::{self, Value};
 
@@ -18,65 +18,63 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    Run {
-        command: String,
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = true)]
-        args: Vec<String>,
-    },
+    Run(RunCommand),
+    Start(StartCommand),
+    Init(InitCommand),
     Config {
         #[command(subcommand)]
         command: ConfigCommands,
     },
-    Start { },
-    Init { },
 }
+
+trait Runnable {
+    fn run(&self, environment: &str) -> Result<()>;
+}
+
+/// dev run <command> [args]
+#[derive(Args)]
+pub struct RunCommand {
+    command: String,
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = true)]
+    args: Vec<String>,
+}
+
+impl Runnable for RunCommand {
+    fn run(&self, environment: &str) -> Result<()> {
+        let args = self.args.iter().map(String::as_str).collect();
+        run_command(environment, self.command.as_str(), args)
+    }
+}
+
+/// dev start
+#[derive(Args)]
+pub struct StartCommand;
+
+impl Runnable for StartCommand {
+    fn run(&self, environment: &str) -> Result<()> {
+        run_command(environment, "nix", vec!["run", ".#dev.start"])
+    }
+}
+
+/// dev init
+#[derive(Args)]
+pub struct InitCommand;
+
+impl Runnable for InitCommand {
+    fn run(&self, _environment: &str) -> Result<()> {
+        todo!()
+    }
+}
+
 
 impl Commands {
     pub fn run(&self, environment: &str) -> Result<()> {
         match self {
-            Self::Run { command, args } => {
-                let args: Vec<&str> = args.iter().map(String::as_str).collect();
-                self.run_command(environment, command.as_str(), &args)?;
-            },
-            Self::Config { command } => {
-                command.run(environment)?;
-            },
-            Self::Start { } => {
-                self.run_command(environment, "nix", &["run", ".#dev.start"])?;
-            },
-            Self::Init { } => {
-                //File::create_directory().unwrap();
-                //File::create();
-                // Create
-            },
-        };
-        Ok(())
-    }
-
-    fn run_command(&self, environment: &str, command: &str, args: &[&str]) -> Result<()> {
-        let mut process = Command::new(command);
-        for arg in args {
-            process.arg(arg);
+            Self::Run(cmd) => cmd.run(environment),
+            Self::Config { command } => command.run(environment),
+            Self::Start(cmd) => cmd.run(environment),
+            Self::Init(cmd) => cmd.run(environment),
         }
-
-        let repo = Repo::new()?;
-        let config = repo.get_environment(environment.into());
-        for (key, value) in config.values()? {
-            match value {
-                Value::String(value) => process.env(key, value),
-                value => process.env(key, value.to_string()),
-            };
-        }
-
-        let err = process.exec();
-
-        let mut command = vec![command];
-        command.extend(args);
-        let command = command.into_iter()
-            .map(|s| s.into())
-            .collect();
-
-        Err(AppError::RunError(command, CommandError::SpawnError(err)))
     }
 }
 
@@ -140,6 +138,13 @@ impl ConfigCommands {
         Ok(())
     }
 }
+
+fn run_command(environment: &str, command: &str, args: Vec<&str>) -> Result<()> {
+    let repo = Repo::new()?;
+    let env = repo.get_environment(environment.into());
+    env.exec(command, args)
+}
+
 
 #[derive(clap::ValueEnum, Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum ConfigExportFormat {

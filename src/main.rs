@@ -177,6 +177,32 @@ impl Environment<'_> {
         let content = std::fs::read_to_string(file).unwrap();
         toml::from_str(&content).map_err(AppError::ConfigParseError)
     }
+
+    /// Run a given command with all defined environment variables, replacing the current process
+    /// in the with the new one. On success, this method will never return.
+    pub fn exec(&self, path: &str, args: Vec<&str>) -> Result<()> {
+        let mut command = Command::new(path);
+        for arg in &args {
+            command.arg(arg);
+        }
+
+        for (key, value) in self.values()? {
+            match value {
+                Value::String(value) => command.env(key, value),
+                value => command.env(key, value.to_string()),
+            };
+        }
+
+        let err = command.exec();
+
+        let mut all_args = vec![path];
+        all_args.extend(args);
+        let all_args = all_args.into_iter()
+            .map(|s| s.into())
+            .collect();
+
+        Err(AppError::RunError(all_args, CommandError::SpawnError(err)))
+    }
 }
 
 fn main() {
