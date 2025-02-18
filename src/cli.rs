@@ -1,5 +1,8 @@
-use clap::{Parser, Args};
+use std::io::BufRead;
+use std::io::Write;
+use std::fs::File;
 
+use clap::{Parser, Args};
 use toml::{self, Value};
 
 use crate::error::*;
@@ -89,9 +92,66 @@ impl Runnable for &StartCommand {
 #[derive(Args)]
 struct InitCommand;
 
+impl InitCommand {
+    fn prompt(&self, message: &str) -> String {
+        print!("{}", message);
+        std::io::stdout().flush().unwrap();
+
+        let stdin = std::io::stdin();
+        let mut line = String::new();
+        stdin.lock().read_line(&mut line).unwrap();
+        line.trim().into()
+    }
+
+    fn multi_line_prompt(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        loop {
+            let line = self.prompt("> ");
+
+            if line.len() == 0 {
+                return lines;
+            }
+
+            lines.push(line);
+        }
+    }
+
+    fn write_lines(&self, mut output: File, lines: &[String]) {
+        for line in lines {
+            writeln!(output, "{}", line);
+        }
+    }
+
+    fn ensure_dir(&self, path: PathBuf) {
+        match std::fs::create_dir(path) {
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::AlreadyExists => {},
+                    _ => Err(e).unwrap(),
+                }
+            },
+            _ => {},
+        };
+    }
+}
+
 impl Runnable for &InitCommand {
-    fn run<'a>(self, _repo: &Repo, _environment: &Environment<'a>) -> Result<()> {
-        todo!()
+    fn run<'a>(self, repo: &Repo, _environment: &Environment<'a>) -> Result<()> {
+        println!("Welcome to the dev setup process");
+        println!("");
+
+        // Create the .dev directory
+        let dev_dir = repo.repo_path.join(".dev");
+        self.ensure_dir(dev_dir);
+
+        // Create the .dev/developers file
+        println!("Enter the ssh keys of all developers that need access to your env files, each");
+        println!("on their own lines. Once you are done, enter one blank line:");
+        let keys = self.multi_line_prompt();
+        let keys_path = repo.repo_path.join(".dev/developers");
+        self.write_lines(File::create(keys_path).unwrap(), &keys);
+
+        Ok(())
     }
 }
 
