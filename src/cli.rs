@@ -116,9 +116,10 @@ impl InitCommand {
         }
     }
 
-    fn write_lines(&self, mut output: File, lines: &[String]) {
+    fn write_lines(&self, output: PathBuf, lines: &[String]) {
+        let mut output = File::create(output).unwrap();
         for line in lines {
-            writeln!(output, "{}", line);
+            writeln!(output, "{}", line).unwrap();
         }
     }
 
@@ -149,7 +150,7 @@ impl Runnable for &InitCommand {
         println!("on their own lines. Once you are done, enter one blank line:");
         let keys = self.multi_line_prompt();
         let keys_path = repo.repo_path.join(".dev/developers");
-        self.write_lines(File::create(keys_path).unwrap(), &keys);
+        self.write_lines(keys_path, &keys);
 
         Ok(())
     }
