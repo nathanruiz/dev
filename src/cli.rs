@@ -83,8 +83,13 @@ impl Runnable for &RunCommand {
 struct StartCommand;
 
 impl Runnable for &StartCommand {
-    fn run<'a>(self, _repo: &Repo, environment: &Environment<'a>) -> Result<()> {
-        environment.exec("nix", vec!["run", ".#dev.start"])
+    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+        if let Some(commands) = &repo.config.commands {
+            if let Some(start) = &commands.start {
+                return environment.exec("bash", vec!["-ce", &start]);
+            }
+        }
+        Err(AppError::ConfigMissing("commands.start".into()))
     }
 }
 

@@ -18,6 +18,8 @@ pub enum AppError {
     ConfigParseError(toml::de::Error),
     /// Failed to run a command.
     RunError(Vec<String>, CommandError),
+    /// Value was missing from config file.
+    ConfigMissing(String),
 }
 
 #[derive(Debug)]
@@ -41,6 +43,7 @@ impl fmt::Display for AppError {
             AppError::EditorError(cause) => write!(f, "Failed to run editor: {}", cause),
             AppError::ConfigParseError(cause) => write!(f, "Failed to parse config: {}", cause),
             AppError::RunError(command, cause) => write!(f, "Failed to run command '{}': {}", command.join(" "), cause),
+            AppError::ConfigMissing(setting) => write!(f, "Missing required config value '{}'", setting),
         }
     }
 }

@@ -9,22 +9,44 @@ use std::collections::HashMap;
 use clap::{Parser, Subcommand};
 
 use toml::{self, Value};
+use serde::Deserialize;
 use tempfile::NamedTempFile;
 
 use error::*;
 use cli::*;
 
+#[derive(Deserialize)]
+struct Commands {
+    start: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct Config {
+    commands: Option<Commands>,
+}
+
 struct Repo {
     home: String,
     repo_path: PathBuf,
+    config: Config,
 }
 
 impl Repo {
     pub fn new() -> Result<Self> {
         let repo_path = Self::get_repo_path()?;
+        let config_path = repo_path.join(".dev/config.toml");
+        let config = if config_path.is_file() {
+            let content = std::fs::read_to_string(config_path).unwrap();
+            toml::from_str(&content).unwrap()
+        } else {
+            Config {
+                commands: None
+            }
+        };
         Ok(Self {
             home: std::env::var("HOME").unwrap(),
             repo_path,
+            config,
         })
     }
 
@@ -55,7 +77,6 @@ impl Repo {
             repo: self,
         }
     }
-
 }
 
 struct Environment<'a> {
