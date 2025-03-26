@@ -70,10 +70,19 @@ struct RunCommand {
 }
 
 impl Runnable for &RunCommand {
-    fn run<'a>(self, _repo: &Repo, environment: &Environment<'a>) -> Result<()> {
-        let args = self.args.iter()
+    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+        let mut args: Vec<&str> = self.args.iter()
             .map(String::as_str)
             .collect();
+        if let Some(commands) = &repo.config.commands {
+            if let Some(shell) = &commands.shell {
+                args.insert(0, self.command.as_str());
+                args.insert(0, "--");
+                args.insert(0, shell);
+                args.insert(0, "-ce");
+                return environment.exec("bash", args);
+            }
+        }
         environment.exec(self.command.as_str(), args)
     }
 }

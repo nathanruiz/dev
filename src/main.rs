@@ -18,6 +18,7 @@ use cli::*;
 #[derive(Deserialize)]
 struct Commands {
     start: Option<String>,
+    shell: Option<String>,
 }
 
 #[derive(Deserialize)]
