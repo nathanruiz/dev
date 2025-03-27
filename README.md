@@ -50,9 +50,14 @@ of packages required. Even worse, you might be gradually doing upgrades between
 OS releases across your team, and having conflict between the new packages, and
 the old one.
 
-`dev` uses the [Nix package manager](https://nixos.org/) to help with this
-problem. You can still use your language-specific package manager, but for
-those tricky system-level packages, nix helps resolve those issues.
+`dev` allows you to use various tools to maintain external packages:
+- The [Nix package manager](https://nixos.org/) resolves this issue with system
+  level packages, by downloading and making programs and libraries available
+  while within `dev run` or `dev start`. This can be used to automatically set
+  up a certain version of nodejs, python or rust tools.
+- Your language-specific package manager, such as poetry, uv, or npm, can
+  resolve this issue for all packages managed by the language's traditional
+  package repository.
 
 ### Environment variables ###
 
