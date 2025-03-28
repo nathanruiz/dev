@@ -20,15 +20,6 @@
           extensions = [ "rust-src" "rust-analyzer" ];
         };
       in rec {
-        packages.dev = {
-          start = pkgs.writeShellScriptBin "start" ''
-            echo "Starting fake webserver... Press CTRL+C to stop"
-            while :; do
-              sleep 3600
-            done
-          '';
-        };
-
         # `nix develop`
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
