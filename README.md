@@ -59,6 +59,17 @@ the old one.
   resolve this issue for all packages managed by the language's traditional
   package repository.
 
+To set these up, you'll need to add this config to your `.dev/config.toml`:
+```bash
+[commands]
+# Just use a nix environment
+shell = 'nix develop -c -- "$@"'
+# Just use a uv environment
+shell = 'uv run -- "$@"'
+# Use both nix and uv environments together
+shell = 'nix develop -c -- uv run -- "$@"'
+```
+
 ### Environment variables ###
 
 This is a hard one, particularly when it comes to local development. It's not
