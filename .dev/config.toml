@@ -6,3 +6,6 @@ while :; do
 done
 """
 shell = 'nix develop -c -- "$@"'
+
+[commands.checks]
+test = "cargo test"

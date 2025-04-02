@@ -19,6 +19,7 @@ use cli::*;
 struct Commands {
     start: Option<String>,
     shell: Option<String>,
+    checks: Option<HashMap<String, String>>,
 }
 
 #[derive(Deserialize)]
@@ -286,6 +287,7 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
             Self {
                 _temp_dir: temp_dir,
                 repo: Repo {
+                    config: Config { commands: None },
                     home: path.to_str().unwrap().into(),
                     repo_path: path.into(),
                 },

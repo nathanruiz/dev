@@ -39,6 +39,8 @@ enum Commands {
     Run(RunCommand),
     /// Run the main service(s) for this project.
     Start(StartCommand),
+    /// Run all CI checks enabled for this project.
+    Check(CheckCommand),
     /// Initial dev tool files in a git repo.
     Init(InitCommand),
     /// Interact with environment variables in an environment.
@@ -54,6 +56,7 @@ impl Runnable for &Commands {
             Commands::Run(cmd) => cmd.run(repo, environment),
             Commands::Config { command } => command.run(repo, environment),
             Commands::Start(cmd) => cmd.run(repo, environment),
+            Commands::Check(cmd) => cmd.run(repo, environment),
             Commands::Init(cmd) => cmd.run(repo, environment),
         }
     }
@@ -99,6 +102,26 @@ impl Runnable for &StartCommand {
             }
         }
         Err(AppError::ConfigMissing("commands.start".into()))
+    }
+}
+
+// dev check
+#[derive(Args)]
+struct CheckCommand;
+
+impl Runnable for &CheckCommand {
+    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+        if let Some(commands) = &repo.config.commands {
+            if let Some(checks) = &commands.checks {
+                for (name, check) in checks {
+                    eprintln!("Running {} check...", name);
+                    environment.exec("bash", vec!["-ce", &check])?;
+                }
+                eprintln!("All checks passed!");
+                return Ok(());
+            }
+        }
+        Err(AppError::ConfigMissing("commands.checks".into()))
     }
 }
 
