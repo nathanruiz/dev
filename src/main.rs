@@ -73,7 +73,7 @@ impl Repo {
         self.repo_path.join(".dev/developers")
     }
 
-    pub fn get_environment<'a>(&'a self, name: String) -> Environment<'a> {
+    pub fn get_environment(&self, name: String) -> Environment<'_> {
         Environment {
             name,
             repo: self,
@@ -289,7 +289,7 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
                 repo: Repo {
                     config: Config { commands: None },
                     home: path.to_str().unwrap().into(),
-                    repo_path: path.into(),
+                    repo_path: path,
                 },
             }
         }
@@ -322,7 +322,7 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
         assert_eq!(content, "test content\n");
 
         // Encrypted file should not contain the original content
-        let content = fs::read_to_string(&setup.env().path()).unwrap();
+        let content = fs::read_to_string(setup.env().path()).unwrap();
         assert!(!content.contains("test content"));
     }
 

@@ -1,6 +1,5 @@
 use std::{fmt, io};
 
-use toml;
 
 #[derive(Debug)]
 pub enum AppError {

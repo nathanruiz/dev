@@ -8,4 +8,5 @@ done
 shell = 'nix develop -c -- "$@"'
 
 [commands.checks]
+lint = "cargo clippy"
 test = "cargo test"

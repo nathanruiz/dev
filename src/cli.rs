@@ -29,7 +29,7 @@ impl Cli {
 }
 
 trait Runnable {
-    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()>;
+    fn run(self, repo: &Repo, environment: &Environment<'_>) -> Result<()>;
 }
 
 // dev ...
@@ -51,7 +51,7 @@ enum Commands {
 }
 
 impl Runnable for &Commands {
-    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+    fn run(self, repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         match self {
             Commands::Run(cmd) => cmd.run(repo, environment),
             Commands::Config { command } => command.run(repo, environment),
@@ -73,7 +73,7 @@ struct RunCommand {
 }
 
 impl Runnable for &RunCommand {
-    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+    fn run(self, repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         let mut args: Vec<&str> = self.args.iter()
             .map(String::as_str)
             .collect();
@@ -95,7 +95,7 @@ impl Runnable for &RunCommand {
 struct StartCommand;
 
 impl Runnable for &StartCommand {
-    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+    fn run(self, repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         if let Some(commands) = &repo.config.commands {
             if let Some(start) = &commands.start {
                 return environment.exec("bash", vec!["-ce", &start]);
@@ -110,7 +110,7 @@ impl Runnable for &StartCommand {
 struct CheckCommand;
 
 impl Runnable for &CheckCommand {
-    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+    fn run(self, repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         if let Some(commands) = &repo.config.commands {
             if let Some(checks) = &commands.checks {
                 for (name, check) in checks {
@@ -145,7 +145,7 @@ impl InitCommand {
         loop {
             let line = self.prompt("> ");
 
-            if line.len() == 0 {
+            if line.is_empty() {
                 return lines;
             }
 
@@ -161,22 +161,19 @@ impl InitCommand {
     }
 
     fn ensure_dir(&self, path: PathBuf) {
-        match std::fs::create_dir(path) {
-            Err(e) => {
-                match e.kind() {
-                    std::io::ErrorKind::AlreadyExists => {},
-                    _ => Err(e).unwrap(),
-                }
-            },
-            _ => {},
+        if let Err(e) = std::fs::create_dir(path) {
+            match e.kind() {
+                std::io::ErrorKind::AlreadyExists => {},
+                _ => panic!("{:?}", e),
+            }
         };
     }
 }
 
 impl Runnable for &InitCommand {
-    fn run<'a>(self, repo: &Repo, _environment: &Environment<'a>) -> Result<()> {
+    fn run(self, repo: &Repo, _environment: &Environment<'_>) -> Result<()> {
         println!("Welcome to the dev setup process");
-        println!("");
+        println!();
 
         // Create the .dev directory
         let dev_dir = repo.repo_path.join(".dev");
@@ -203,7 +200,7 @@ enum ConfigCommands {
 }
 
 impl Runnable for &ConfigCommands {
-    fn run<'a>(self, repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+    fn run(self, repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         match self {
             ConfigCommands::Export(cmd) => cmd.run(repo, environment),
             ConfigCommands::Edit(cmd) => cmd.run(repo, environment),
@@ -219,7 +216,7 @@ struct ConfigExportCommand {
 }
 
 impl Runnable for &ConfigExportCommand {
-    fn run<'a>(self, _repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+    fn run(self, _repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         match self.format {
             ConfigExportFormat::Raw => {
                 let mut file = environment.decrypt()?;
@@ -254,7 +251,7 @@ impl Runnable for &ConfigExportCommand {
 struct ConfigEditCommand;
 
 impl Runnable for &ConfigEditCommand {
-    fn run<'a>(self, _repo: &Repo, environment: &Environment<'a>) -> Result<()> {
+    fn run(self, _repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         environment.edit()
     }
 }
