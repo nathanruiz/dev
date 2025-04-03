@@ -110,12 +110,25 @@ impl Runnable for &StartCommand {
 struct CheckCommand;
 
 impl Runnable for &CheckCommand {
-    fn run(self, repo: &Repo, environment: &Environment<'_>) -> Result<()> {
+    fn run(self, repo: &Repo, _environment: &Environment<'_>) -> Result<()> {
         if let Some(commands) = &repo.config.commands {
             if let Some(checks) = &commands.checks {
                 for (name, check) in checks {
                     eprintln!("Running {} check...", name);
-                    environment.exec("bash", vec!["-ce", &check])?;
+                    let mut command = Command::new("bash");
+                    command.arg("-ce");
+                    command.arg(check);
+
+                    let result = match command.status() {
+                        Ok(status) if status.success() => Ok(()),
+                        Ok(status) => Err(CommandError::FailedError {
+                            status,
+                            stderr: None,
+                        }),
+                        Err(err) => Err(CommandError::SpawnError(err)),
+                    };
+                    let command = vec!["bash".into(), "-ce".into(), check.into()];
+                    result.map_err(|err| AppError::RunError(command, err))?;
                 }
                 eprintln!("All checks passed!");
                 return Ok(());
