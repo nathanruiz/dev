@@ -4,7 +4,7 @@ mod cli;
 use std::path::PathBuf;
 use std::process::Command;
 use std::os::unix::process::CommandExt;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use clap::{Parser, Subcommand};
 
@@ -19,7 +19,7 @@ use cli::*;
 struct Commands {
     start: Option<String>,
     shell: Option<String>,
-    checks: Option<HashMap<String, String>>,
+    checks: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Deserialize)]
@@ -195,7 +195,7 @@ impl Environment<'_> {
         Ok(())
     }
 
-    pub fn values(&self) -> Result<HashMap<String, Value>> {
+    pub fn values(&self) -> Result<BTreeMap<String, Value>> {
         let file = self.decrypt()?;
         let content = std::fs::read_to_string(file).unwrap();
         toml::from_str(&content).map_err(AppError::ConfigParseError)
@@ -210,10 +210,11 @@ impl Environment<'_> {
         }
 
         for (key, value) in self.values()? {
-            match value {
-                Value::String(value) => command.env(key, value),
-                value => command.env(key, value.to_string()),
+            let value = match value {
+                Value::String(value) => value,
+                value => serde_json::to_string(&value).unwrap(),
             };
+            command.env(key, value);
         }
 
         let err = command.exec();
@@ -261,13 +262,13 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
 -----END OPENSSH PRIVATE KEY-----
     ";
 
-    struct TestSetup {
+    pub struct TestSetup {
         _temp_dir: TempDir,
-        repo: Repo,
+        pub repo: Repo,
     }
 
     impl TestSetup {
-        fn new() -> Self {
+        pub fn new() -> Self {
             let temp_dir = TempDir::new().unwrap();
             let path: PathBuf = temp_dir.path().into();
             Command::new("git")
@@ -294,7 +295,7 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
             }
         }
 
-        fn env(&self) -> Environment {
+        pub fn env(&self) -> Environment {
             self.repo.get_environment("local".into())
         }
     }

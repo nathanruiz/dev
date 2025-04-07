@@ -232,29 +232,44 @@ impl Runnable for &ConfigExportCommand {
     fn run(self, _repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         match self.format {
             ConfigExportFormat::Raw => {
-                let mut file = environment.decrypt()?;
-                std::io::copy(&mut file, &mut std::io::stdout()).unwrap();
+                ConfigExportCommand::format_raw(environment, &mut std::io::stdout())
             },
             ConfigExportFormat::Json => {
-                let values = environment.values()?;
-                let json = serde_json::to_string_pretty(&values).unwrap();
-                println!("{}", json);
+                ConfigExportCommand::format_json(environment, &mut std::io::stdout())
             },
             ConfigExportFormat::Docker => {
-                for (key, value) in environment.values()? {
-                    let value = match value {
-                        Value::String(value) => value,
-                        value => serde_json::to_string(&value).unwrap(),
-                    };
-                    // Docker env files don't support newlines in environment
-                    // variable values. We replace them with spaces to attempt
-                    // to allow it to still work if the use case doesn't require
-                    // the newlines.
-                    let value = value.replace("\n", " ");
-                    println!("{}={}", key, value);
-                }
+                ConfigExportCommand::format_docker(environment, &mut std::io::stdout())
             },
-        };
+        }
+    }
+}
+
+impl ConfigExportCommand {
+    fn format_raw<W: Write>(environment: &Environment<'_>, out: &mut W) -> Result<()> {
+        let mut file = environment.decrypt()?;
+        std::io::copy(&mut file, out).unwrap();
+        Ok(())
+    }
+
+    fn format_json<W: Write>(environment: &Environment<'_>, out: &mut W) -> Result<()> {
+        let values = environment.values()?;
+        serde_json::to_writer_pretty(out, &values).unwrap();
+        Ok(())
+    }
+
+    fn format_docker<W: Write>(environment: &Environment<'_>, out: &mut W) -> Result<()> {
+        for (key, value) in environment.values()? {
+            let value = match value {
+                Value::String(value) => value,
+                value => serde_json::to_string(&value).unwrap(),
+            };
+            // Docker env files don't support newlines in environment
+            // variable values. We replace them with spaces to attempt
+            // to allow it to still work if the use case doesn't require
+            // the newlines.
+            let value = value.replace("\n", " ");
+            writeln!(out, "{}={}", key, value).unwrap();
+        }
         Ok(())
     }
 }
@@ -275,4 +290,58 @@ enum ConfigExportFormat {
     Raw,
     Json,
     Docker,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::TestSetup;
+
+    fn set_envs(setup: &mut TestSetup) {
+        let env = setup.env();
+        let mut file = env.decrypt().unwrap();
+        writeln!(file, "ABC=123").unwrap();
+        writeln!(file, "{}", "TEST = { b = 2, a = 1 }").unwrap();
+        file.flush().unwrap();
+        env.encrypt(&file).unwrap();
+    }
+
+    #[test]
+    fn test_config_export_raw_format() {
+        let mut setup = TestSetup::new();
+        set_envs(&mut setup);
+        let mut output = Vec::new();
+
+        ConfigExportCommand::format_raw(&setup.env(), &mut output).unwrap();
+
+        assert_eq!(&output, b"ABC=123\nTEST = { b = 2, a = 1 }\n");
+    }
+
+    #[test]
+    fn test_config_export_json_format() {
+        let mut setup = TestSetup::new();
+        set_envs(&mut setup);
+        let mut output = Vec::new();
+
+        ConfigExportCommand::format_json(&setup.env(), &mut output).unwrap();
+
+        assert_eq!(&output, br#"{
+  "ABC": 123,
+  "TEST": {
+    "a": 1,
+    "b": 2
+  }
+}"#)
+    }
+
+    #[test]
+    fn test_config_export_docker_format() {
+        let mut setup = TestSetup::new();
+        set_envs(&mut setup);
+        let mut output = Vec::new();
+
+        ConfigExportCommand::format_docker(&setup.env(), &mut output).unwrap();
+
+        assert_eq!(&output, b"ABC=123\nTEST={\"a\":1,\"b\":2}\n");
+    }
 }
