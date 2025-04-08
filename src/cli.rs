@@ -1,8 +1,10 @@
-use std::io::BufRead;
 use std::io::Write;
 use std::fs::File;
 
 use clap::{Parser, Args};
+use inquire::{self, Confirm, Text};
+use inquire::error::InquireResult;
+use inquire::ui::RenderConfig;
 use toml::{self, Value};
 
 use crate::error::*;
@@ -143,36 +145,6 @@ impl Runnable for &CheckCommand {
 struct InitCommand;
 
 impl InitCommand {
-    fn prompt(&self, message: &str) -> String {
-        print!("{}", message);
-        std::io::stdout().flush().unwrap();
-
-        let stdin = std::io::stdin();
-        let mut line = String::new();
-        stdin.lock().read_line(&mut line).unwrap();
-        line.trim().into()
-    }
-
-    fn multi_line_prompt(&self) -> Vec<String> {
-        let mut lines = Vec::new();
-        loop {
-            let line = self.prompt("> ");
-
-            if line.is_empty() {
-                return lines;
-            }
-
-            lines.push(line);
-        }
-    }
-
-    fn write_lines(&self, output: PathBuf, lines: &[String]) {
-        let mut output = File::create(output).unwrap();
-        for line in lines {
-            writeln!(output, "{}", line).unwrap();
-        }
-    }
-
     fn ensure_dir(&self, path: PathBuf) {
         if let Err(e) = std::fs::create_dir(path) {
             match e.kind() {
@@ -181,10 +153,32 @@ impl InitCommand {
             }
         };
     }
+
+    fn prompt_for_ssh_keys(&self, repo: &Repo) -> InquireResult<()> {
+        let keys_path = repo.repo_path.join(".dev/developers");
+        let mut output = File::create(keys_path).unwrap();
+        println!("This tool uses SSH keys to encrypt environment variables.");
+        let mut more = Confirm::new("Do you want to add any SSH keys?")
+            .with_default(true)
+            .prompt()?;
+
+        while more {
+            let key = Text::new("Enter your SSH public key:").prompt()?;
+            writeln!(output, "{}", key).unwrap();
+            more = Confirm::new("Do you want to add more SSH keys?")
+                .with_default(true)
+                .prompt()?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Runnable for &InitCommand {
     fn run(self, repo: &Repo, _environment: &Environment<'_>) -> Result<()> {
+        let render_config = RenderConfig::default();
+        inquire::set_global_render_config(render_config);
+
         println!("Welcome to the dev setup process");
         println!();
 
@@ -193,11 +187,7 @@ impl Runnable for &InitCommand {
         self.ensure_dir(dev_dir);
 
         // Create the .dev/developers file
-        println!("Enter the ssh keys of all developers that need access to your env files, each");
-        println!("on their own lines. Once you are done, enter one blank line:");
-        let keys = self.multi_line_prompt();
-        let keys_path = repo.repo_path.join(".dev/developers");
-        self.write_lines(keys_path, &keys);
+        self.prompt_for_ssh_keys(repo).unwrap();
 
         Ok(())
     }

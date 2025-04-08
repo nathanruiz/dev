@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
+inquire = "0.7.5"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.132", features = ["preserve_order"] }
 tempfile = "3.13.0"
