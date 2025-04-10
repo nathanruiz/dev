@@ -185,7 +185,7 @@ impl Environment<'_> {
     }
 
     pub fn edit(&self) -> Result<()> {
-        let file = self.decrypt().map_err(AppError::AgeDecryptError)?;
+        let file = self.decrypt()?;
 
         let old_hash = self.calculate_checksum(&file)?;
 
@@ -204,7 +204,7 @@ impl Environment<'_> {
     }
 
     pub fn values(&self) -> Result<BTreeMap<String, Value>> {
-        let file = self.decrypt().map_err(AppError::AgeDecryptError)?;
+        let file = self.decrypt()?;
         let content = std::fs::read_to_string(file).unwrap();
         toml::from_str(&content).map_err(AppError::ConfigParseError)
     }

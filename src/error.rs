@@ -25,7 +25,7 @@ impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AppError::GitError(cause) => write!(f, "Failed to run git: {}", cause),
-            AppError::AgeDecryptError(cause) => write!(f, "Failed to run age decrypt: {}", cause),
+            AppError::AgeDecryptError(cause) => write!(f, "Failed to decrypt env vars: {}", cause),
             AppError::AgeEncryptError(cause) => write!(f, "Failed to run age encrypt: {}", cause),
             AppError::ChecksumError(cause) => write!(f, "Failed to run checksum: {}", cause),
             AppError::EditorError(cause) => write!(f, "Failed to run editor: {}", cause),
@@ -33,6 +33,12 @@ impl fmt::Display for AppError {
             AppError::RunError(command, cause) => write!(f, "Failed to run command '{}': {}", command.join(" "), cause),
             AppError::ConfigMissing(setting) => write!(f, "Missing required config value '{}'", setting),
         }
+    }
+}
+
+impl From<AgeDecryptError> for AppError {
+    fn from(err: AgeDecryptError) -> Self {
+        Self::AgeDecryptError(err)
     }
 }
 
@@ -45,8 +51,8 @@ pub enum AgeDecryptError {
 impl fmt::Display for AgeDecryptError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Io(e) => write!(f, "Failed to decrypt environment variables: {}", e),
-            Self::Decrypt(e) => write!(f, "Failed to decrypt environment variables: {}", e),
+            Self::Io(e) => write!(f, "{}", e),
+            Self::Decrypt(e) => write!(f, "{}", e),
         }
     }
 }

@@ -236,7 +236,7 @@ impl Runnable for &ConfigExportCommand {
 
 impl ConfigExportCommand {
     fn format_raw<W: Write>(environment: &Environment<'_>, out: &mut W) -> Result<()> {
-        let mut file = environment.decrypt().map_err(AppError::AgeDecryptError)?;
+        let mut file = environment.decrypt()?;
         std::io::copy(&mut file, out).unwrap();
         Ok(())
     }
