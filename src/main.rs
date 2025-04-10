@@ -1,16 +1,22 @@
 mod error;
 mod cli;
 
+use std::collections::BTreeMap;
+use std::fs::File;
+use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
-use std::os::unix::process::CommandExt;
-use std::collections::BTreeMap;
+use std::io::{BufReader, Seek, SeekFrom};
+use std::iter;
 
 use clap::{Parser, Subcommand};
 
-use toml::{self, Value};
+use age::Decryptor;
+use age::armor::ArmoredReader;
+use age::ssh::Identity;
 use serde::Deserialize;
 use tempfile::NamedTempFile;
+use toml::{self, Value};
 
 use error::*;
 use cli::*;
@@ -56,7 +62,8 @@ impl Repo {
         let output = Command::new("git")
             .args(["rev-parse", "--show-toplevel"])
             .output()
-            .map_err(|e| AppError::GitError(CommandError::SpawnError(e)))?;
+            .map_err(CommandError::SpawnError)
+            .map_err(AppError::GitError)?;
 
         if !output.status.success() {
             return Err(AppError::GitError(CommandError::FailedError {
@@ -92,29 +99,27 @@ impl Environment<'_> {
         self.repo.repo_path.join(name)
     }
 
-    pub fn decrypt(&self) -> Result<NamedTempFile> {
+    pub fn decrypt(&self) -> std::result::Result<NamedTempFile, AgeDecryptError> {
         let env_path = self.path();
-        let name = env_path.file_name().unwrap();
-        let file = NamedTempFile::with_suffix(name).unwrap();
+        let mut output = match env_path.file_name() {
+            Some(name) => NamedTempFile::with_suffix(name)?,
+            None => NamedTempFile::with_suffix("dev.toml")?,
+        };
 
-        if std::fs::exists(&env_path).unwrap() {
-            let output = Command::new("age")
-                .args(["-d"])
-                .args(["-i", &format!("{}/.ssh/id_ed25519", self.repo.home)])
-                .args(["-o", file.path().to_str().unwrap()])
-                .args(["--", env_path.to_str().unwrap()])
-                .output()
-                .map_err(|e| AppError::AgeDecryptError(CommandError::SpawnError(e)))?;
+        let private_key_path = format!("{}/.ssh/id_ed25519", self.repo.home);
+        let private_key = File::open(private_key_path)?;
+        let private_key = BufReader::new(private_key);
+        let private_key = Identity::from_buffer(private_key, None)?;
 
-            if !output.status.success() {
-                return Err(AppError::AgeDecryptError(CommandError::FailedError {
-                    status: output.status,
-                    stderr: Some(String::from_utf8_lossy(&output.stderr).to_string()),
-                }));
-            }
+        if std::fs::exists(&env_path)? {
+            let input = File::open(env_path)?;
+            let decryptor = Decryptor::new(ArmoredReader::new(input))?;
+            let mut input = decryptor.decrypt(iter::once(&private_key as _))?;
+            std::io::copy(&mut input, &mut output)?;
+            output.seek(SeekFrom::Start(0))?;
         }
 
-        Ok(file)
+        Ok(output)
     }
 
     pub fn encrypt(&self, file: &NamedTempFile) -> Result<()> {
@@ -124,7 +129,8 @@ impl Environment<'_> {
             .args(["-o", self.path().to_str().unwrap()])
             .args(["--", file.path().to_str().unwrap()])
             .output()
-            .map_err(|e| AppError::AgeEncryptError(CommandError::SpawnError(e)))?;
+            .map_err(CommandError::SpawnError)
+            .map_err(AppError::AgeEncryptError)?;
 
         if !output.status.success() {
             return Err(AppError::AgeEncryptError(CommandError::FailedError {
@@ -140,7 +146,8 @@ impl Environment<'_> {
         let output = Command::new("sha256sum")
             .args(["--", file.path().to_str().unwrap()])
             .output()
-            .map_err(|e| AppError::ChecksumError(CommandError::SpawnError(e)))?;
+            .map_err(CommandError::SpawnError)
+            .map_err(AppError::ChecksumError)?;
 
         if !output.status.success() {
             return Err(AppError::ChecksumError(CommandError::FailedError {
@@ -164,7 +171,8 @@ impl Environment<'_> {
         let status = Command::new("bash")
             .args(["-c", &format!("{} -- '{}'", editor, path)])
             .status()
-            .map_err(|e| AppError::EditorError(CommandError::SpawnError(e)))?;
+            .map_err(CommandError::SpawnError)
+            .map_err(AppError::EditorError)?;
 
         if !status.success() {
             return Err(AppError::EditorError(CommandError::FailedError {
@@ -177,7 +185,7 @@ impl Environment<'_> {
     }
 
     pub fn edit(&self) -> Result<()> {
-        let file = self.decrypt()?;
+        let file = self.decrypt().map_err(AppError::AgeDecryptError)?;
 
         let old_hash = self.calculate_checksum(&file)?;
 
@@ -196,7 +204,7 @@ impl Environment<'_> {
     }
 
     pub fn values(&self) -> Result<BTreeMap<String, Value>> {
-        let file = self.decrypt()?;
+        let file = self.decrypt().map_err(AppError::AgeDecryptError)?;
         let content = std::fs::read_to_string(file).unwrap();
         toml::from_str(&content).map_err(AppError::ConfigParseError)
     }

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+age = { version = "0.11.1", features = ["armor", "ssh"] }
 clap = { version = "4.5.20", features = ["derive"] }
 inquire = "0.7.5"
 serde = { version = "1.0.219", features = ["derive"] }

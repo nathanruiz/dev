@@ -6,7 +6,7 @@ pub enum AppError {
     /// Failed to run a git command.
     GitError(CommandError),
     /// Failed to decrypt the config file.
-    AgeDecryptError(CommandError),
+    AgeDecryptError(AgeDecryptError),
     /// Failed to encrypt the config file.
     AgeEncryptError(CommandError),
     /// Failed to verify the checksum of the config file.
@@ -19,17 +19,6 @@ pub enum AppError {
     RunError(Vec<String>, CommandError),
     /// Value was missing from config file.
     ConfigMissing(String),
-}
-
-#[derive(Debug)]
-pub enum CommandError {
-    /// The command failed to spawn.
-    SpawnError(io::Error),
-    /// The command failed with an error message.
-    FailedError {
-        status: std::process::ExitStatus,
-        stderr: Option<String>,
-    },
 }
 
 impl fmt::Display for AppError {
@@ -45,6 +34,44 @@ impl fmt::Display for AppError {
             AppError::ConfigMissing(setting) => write!(f, "Missing required config value '{}'", setting),
         }
     }
+}
+
+#[derive(Debug)]
+pub enum AgeDecryptError {
+    Io(std::io::Error),
+    Decrypt(age::DecryptError),
+}
+
+impl fmt::Display for AgeDecryptError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "Failed to decrypt environment variables: {}", e),
+            Self::Decrypt(e) => write!(f, "Failed to decrypt environment variables: {}", e),
+        }
+    }
+}
+
+impl From<std::io::Error> for AgeDecryptError {
+    fn from(err: std::io::Error) -> Self {
+        Self::Io(err)
+    }
+}
+
+impl From<age::DecryptError> for AgeDecryptError {
+    fn from(err: age::DecryptError) -> Self {
+        Self::Decrypt(err)
+    }
+}
+
+#[derive(Debug)]
+pub enum CommandError {
+    /// The command failed to spawn.
+    SpawnError(io::Error),
+    /// The command failed with an error message.
+    FailedError {
+        status: std::process::ExitStatus,
+        stderr: Option<String>,
+    },
 }
 
 impl fmt::Display for CommandError {
