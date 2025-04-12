@@ -11,6 +11,3 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.132", features = ["preserve_order"] }
 tempfile = "3.13.0"
 toml = "0.8.19"
-
-[dev-dependencies]
-clippy = "0.0.302"
