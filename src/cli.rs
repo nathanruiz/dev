@@ -154,7 +154,7 @@ impl InitCommand {
     }
 
     fn prompt_for_ssh_keys(&self) -> InquireResult<Vec<String>> {
-        println!("This tool uses SSH keys to encrypt environment variables.");
+        eprintln!("This tool uses SSH keys to encrypt environment variables.");
         let mut keys = vec![];
         let mut more = Confirm::new("Do you want to add any SSH keys?")
             .with_default(true)
@@ -174,14 +174,20 @@ impl InitCommand {
 
 impl Runnable for &InitCommand {
     fn run(self, repo: &Repo, _environment: &Environment<'_>) -> Result<()> {
+        let dev_dir = repo.repo_path.join(".dev");
+        let config_path = dev_dir.join("config.toml");
+        if std::fs::exists(&config_path).unwrap() {
+            eprintln!("Refusing to initialize dev config, {:?} already exists.", config_path);
+            std::process::exit(1);
+        }
+
         let render_config = RenderConfig::default();
         inquire::set_global_render_config(render_config);
 
-        println!("Welcome to the dev setup process.");
-        println!();
+        eprintln!("Welcome to the dev setup process.");
+        eprintln!();
 
         // Create the .dev directory
-        let dev_dir = repo.repo_path.join(".dev");
         self.ensure_dir(dev_dir);
 
         // Prompt for details to put in the config file.
@@ -193,8 +199,8 @@ impl Runnable for &InitCommand {
             keys: Some(keys),
         };
         let config = toml::to_string_pretty(&config).unwrap();
-        std::fs::write(".dev/config.toml", config).unwrap();
-        println!("Config written to .dev/config.toml.");
+        std::fs::write(&config_path, config).unwrap();
+        eprintln!("Config written to {:?}.", config_path);
 
         Ok(())
     }
