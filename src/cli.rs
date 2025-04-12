@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::fs::File;
 
 use clap::{Parser, Args};
 use inquire::{self, Confirm, Text};
@@ -154,23 +153,22 @@ impl InitCommand {
         };
     }
 
-    fn prompt_for_ssh_keys(&self, repo: &Repo) -> InquireResult<()> {
-        let keys_path = repo.repo_path.join(".dev/developers");
-        let mut output = File::create(keys_path).unwrap();
+    fn prompt_for_ssh_keys(&self) -> InquireResult<Vec<String>> {
         println!("This tool uses SSH keys to encrypt environment variables.");
+        let mut keys = vec![];
         let mut more = Confirm::new("Do you want to add any SSH keys?")
             .with_default(true)
             .prompt()?;
 
         while more {
             let key = Text::new("Enter your SSH public key:").prompt()?;
-            writeln!(output, "{}", key).unwrap();
+            keys.push(key);
             more = Confirm::new("Do you want to add more SSH keys?")
                 .with_default(true)
                 .prompt()?;
         }
 
-        Ok(())
+        Ok(keys)
     }
 }
 
@@ -179,15 +177,24 @@ impl Runnable for &InitCommand {
         let render_config = RenderConfig::default();
         inquire::set_global_render_config(render_config);
 
-        println!("Welcome to the dev setup process");
+        println!("Welcome to the dev setup process.");
         println!();
 
         // Create the .dev directory
         let dev_dir = repo.repo_path.join(".dev");
         self.ensure_dir(dev_dir);
 
-        // Create the .dev/developers file
-        self.prompt_for_ssh_keys(repo).unwrap();
+        // Prompt for details to put in the config file.
+        let keys = self.prompt_for_ssh_keys().unwrap();
+
+        // Write settings to the config.toml file
+        let config = Config {
+            commands: None,
+            keys: Some(keys),
+        };
+        let config = toml::to_string_pretty(&config).unwrap();
+        std::fs::write(".dev/config.toml", config).unwrap();
+        println!("Config written to .dev/config.toml.");
 
         Ok(())
     }

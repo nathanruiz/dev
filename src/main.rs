@@ -15,21 +15,21 @@ use clap::{Parser, Subcommand};
 use age::{Decryptor, Encryptor};
 use age::armor::{ArmoredReader, ArmoredWriter};
 use age::ssh::{Identity, Recipient};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use toml::{self, Value};
 
 use error::*;
 use cli::*;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct Commands {
     start: Option<String>,
     shell: Option<String>,
     checks: Option<BTreeMap<String, String>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct Config {
     commands: Option<Commands>,
     keys: Option<Vec<String>>,

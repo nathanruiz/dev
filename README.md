@@ -91,10 +91,11 @@ dev config edit [-e env]
 ```
 
 ## Getting started ##
-To set up the dev command in you repo, follow these steps in the root of your repo:
+To set up the dev command in you repo, run the following command and follow the
+prompts. This will set your `.dev/config.toml` with enough details to get you
+started.
 ```
-mkdir -p .dev
-cp ~/.ssh/id_ed25519.pub .dev/developers
+dev init
 ```
 
 ## Commands ##
