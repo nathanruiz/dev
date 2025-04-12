@@ -3,17 +3,18 @@ mod cli;
 
 use std::collections::BTreeMap;
 use std::fs::File;
+use std::io::{BufReader, Seek, SeekFrom};
+use std::iter;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
-use std::io::{BufReader, Seek, SeekFrom};
-use std::iter;
+use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
 
-use age::Decryptor;
-use age::armor::ArmoredReader;
-use age::ssh::Identity;
+use age::{Decryptor, Encryptor};
+use age::armor::{ArmoredReader, ArmoredWriter};
+use age::ssh::{Identity, Recipient};
 use serde::Deserialize;
 use tempfile::NamedTempFile;
 use toml::{self, Value};
@@ -31,6 +32,7 @@ struct Commands {
 #[derive(Deserialize)]
 struct Config {
     commands: Option<Commands>,
+    keys: Option<Vec<String>>,
 }
 
 struct Repo {
@@ -48,7 +50,8 @@ impl Repo {
             toml::from_str(&content).unwrap()
         } else {
             Config {
-                commands: None
+                commands: None,
+                keys: None,
             }
         };
         Ok(Self {
@@ -74,10 +77,6 @@ impl Repo {
 
         let path = std::str::from_utf8(&output.stdout).unwrap();
         Ok(path.trim().into())
-    }
-
-    fn keys_path(&self) -> PathBuf {
-        self.repo_path.join(".dev/developers")
     }
 
     pub fn get_environment(&self, name: String) -> Environment<'_> {
@@ -122,22 +121,28 @@ impl Environment<'_> {
         Ok(output)
     }
 
-    pub fn encrypt(&self, file: &NamedTempFile) -> Result<()> {
-        let output = Command::new("age")
-            .args(["-e", "-a"])
-            .args(["-R", self.repo.keys_path().to_str().unwrap()])
-            .args(["-o", self.path().to_str().unwrap()])
-            .args(["--", file.path().to_str().unwrap()])
-            .output()
-            .map_err(CommandError::SpawnError)
-            .map_err(AppError::AgeEncryptError)?;
+    pub fn encrypt(&self, mut input: &NamedTempFile) -> std::result::Result<(), AgeEncryptError> {
+        let env_path = self.path();
+        let keys = match &self.repo.config.keys {
+            Some(keys) => {
+                let mut result = Vec::with_capacity(keys.len());
+                for key in keys {
+                    result.push(Recipient::from_str(key)?);
+                }
+                result
+            },
+            None => Vec::new(),
+        };
+        let keys = keys.iter().map(|key| key as _);
 
-        if !output.status.success() {
-            return Err(AppError::AgeEncryptError(CommandError::FailedError {
-                status: output.status,
-                stderr: Some(String::from_utf8_lossy(&output.stderr).to_string()),
-            }));
-        }
+        let encryptor = Encryptor::with_recipients(keys)?;
+        let output = File::create(env_path)?;
+        let output = ArmoredWriter::wrap_output(output, age::armor::Format::AsciiArmor)?;
+        let mut output = encryptor.wrap_output(output)?;
+
+        input.seek(SeekFrom::Start(0))?;
+        std::io::copy(&mut input, &mut output)?;
+        output.finish().and_then(|armor| armor.finish())?;
 
         Ok(())
     }
@@ -284,9 +289,8 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
                 .output()
                 .unwrap();
 
-            // Create a dummy developers file
+            // Create a .dev directory for secrets
             std::fs::create_dir(path.join(".dev")).unwrap();
-            std::fs::write(path.join(".dev/developers"), PUBLIC_KEY.trim()).unwrap();
 
             // Write ssh keys to fake home directory
             std::fs::create_dir(path.join(".ssh")).unwrap();
@@ -296,7 +300,10 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
             Self {
                 _temp_dir: temp_dir,
                 repo: Repo {
-                    config: Config { commands: None },
+                    config: Config {
+                        commands: None,
+                        keys: Some(vec![PUBLIC_KEY.trim().into()]),
+                    },
                     home: path.to_str().unwrap().into(),
                     repo_path: path,
                 },

@@ -1,3 +1,7 @@
+keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKcOReHMyKeBPkpvxWPFEOFHIiLwsVTadwZAG98km7mQ"
+]
+
 [commands]
 start = """
 echo "Starting fake webserver... Press CTRL+C to stop"
