@@ -18,7 +18,7 @@ pub struct Cli {
     environment: String,
 
     #[command(subcommand)]
-    command: Commands,
+    command: SubCommand,
 }
 
 impl Cli {
@@ -35,7 +35,7 @@ trait Runnable {
 
 // dev ...
 #[derive(Subcommand)]
-enum Commands {
+enum SubCommand {
     /// Run a command inside a specified environment.
     Run(RunCommand),
     /// Run the main service(s) for this project.
@@ -47,18 +47,18 @@ enum Commands {
     /// Interact with environment variables in an environment.
     Config {
         #[command(subcommand)]
-        command: ConfigCommands,
+        command: ConfigCommand,
     },
 }
 
-impl Runnable for &Commands {
+impl Runnable for &SubCommand {
     fn run(self, repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         match self {
-            Commands::Run(cmd) => cmd.run(repo, environment),
-            Commands::Config { command } => command.run(repo, environment),
-            Commands::Start(cmd) => cmd.run(repo, environment),
-            Commands::Check(cmd) => cmd.run(repo, environment),
-            Commands::Init(cmd) => cmd.run(repo, environment),
+            SubCommand::Run(cmd) => cmd.run(repo, environment),
+            SubCommand::Config { command } => command.run(repo, environment),
+            SubCommand::Start(cmd) => cmd.run(repo, environment),
+            SubCommand::Check(cmd) => cmd.run(repo, environment),
+            SubCommand::Init(cmd) => cmd.run(repo, environment),
         }
     }
 }
@@ -154,6 +154,7 @@ impl InitCommand {
     }
 
     fn prompt_for_ssh_keys(&self) -> InquireResult<Vec<String>> {
+        eprintln!();
         eprintln!("This tool uses SSH keys to encrypt environment variables.");
         let mut keys = vec![];
         let mut more = Confirm::new("Do you want to add any SSH keys?")
@@ -170,6 +171,29 @@ impl InitCommand {
 
         Ok(keys)
     }
+
+    fn prompt_for_check_commands(&self) -> InquireResult<BTreeMap<String, String>> {
+        eprintln!();
+        eprintln!("Check commands include anything that should be run as part of CI.");
+        eprintln!("By configuring them in the dev tool, you'll be able to use `dev check`");
+        eprintln!("to run them all locally, before pushing up your code.");
+
+        let mut result = BTreeMap::new();
+        let mut more = Confirm::new("Do you want to add any check commands?")
+            .with_default(true)
+            .prompt()?;
+
+        while more {
+            let name = Text::new("Enter the name of this check:").prompt()?;
+            let command = Text::new("Enter the command:").prompt()?;
+            result.insert(name, command);
+            more = Confirm::new("Do you want to add another check command?")
+                .with_default(true)
+                .prompt()?;
+        }
+
+        Ok(result)
+    }
 }
 
 impl Runnable for &InitCommand {
@@ -185,17 +209,21 @@ impl Runnable for &InitCommand {
         inquire::set_global_render_config(render_config);
 
         eprintln!("Welcome to the dev setup process.");
-        eprintln!();
 
         // Create the .dev directory
         self.ensure_dir(dev_dir);
 
         // Prompt for details to put in the config file.
         let keys = self.prompt_for_ssh_keys().unwrap();
+        let checks = self.prompt_for_check_commands().unwrap();
 
         // Write settings to the config.toml file
         let config = Config {
-            commands: None,
+            commands: Some(Commands {
+                shell: None,
+                start: None,
+                checks: if !checks.is_empty() { Some(checks) } else { None },
+            }),
             keys: Some(keys),
         };
         let config = toml::to_string_pretty(&config).unwrap();
@@ -208,18 +236,18 @@ impl Runnable for &InitCommand {
 
 // dev config ...
 #[derive(Subcommand)]
-enum ConfigCommands {
+enum ConfigCommand {
     /// Export encrypted environment variables for use by other tools.
     Export(ConfigExportCommand),
     /// Decrypt and open the environment variable file in your default editor.
     Edit(ConfigEditCommand),
 }
 
-impl Runnable for &ConfigCommands {
+impl Runnable for &ConfigCommand {
     fn run(self, repo: &Repo, environment: &Environment<'_>) -> Result<()> {
         match self {
-            ConfigCommands::Export(cmd) => cmd.run(repo, environment),
-            ConfigCommands::Edit(cmd) => cmd.run(repo, environment),
+            ConfigCommand::Export(cmd) => cmd.run(repo, environment),
+            ConfigCommand::Edit(cmd) => cmd.run(repo, environment),
         }
     }
 }
