@@ -194,6 +194,41 @@ impl InitCommand {
 
         Ok(result)
     }
+
+    fn prompt_for_shell_commands(&self) -> InquireResult<Option<String>> {
+        eprintln!();
+        eprintln!("It's common for a project to require extra packages when running");
+        eprintln!("locally. These can include library packages managed by your language's");
+        eprintln!("package manager (pip, npm, etc), or system packages, like libpq or");
+        eprintln!("openssl. When using the `dev start` or `dev run ...` commands, the dev");
+        eprintln!("tool will try to put you in an environment when all those packages are");
+        eprintln!("available. In order to do this, you'll need to provide a command that");
+        eprintln!("will provide those packages for all sub-processes. You can use \"$@\" to");
+        eprintln!("specify the location that your actual command will be substitudted");
+        eprintln!("into. For example:");
+        eprintln!();
+        eprintln!("For entering a nix flake environment:");
+        eprintln!("> nix develop -c -- \"$@\"");
+        eprintln!();
+        eprintln!("For entering a Python uv environment:");
+        eprintln!("> uv run -- \"$@\"");
+        eprintln!();
+        eprintln!("For entering both:");
+        eprintln!("> nix develop -c -- uv run -- \"$@\"");
+        eprintln!();
+
+        let use_shell_command = Confirm::new("Do you want to enter a shell commands?")
+            .with_default(true)
+            .prompt()?;
+
+        if !use_shell_command {
+            return Ok(None);
+        }
+
+        let command = Text::new("Enter the shell command:").prompt()?;
+
+        Ok(Some(command))
+    }
 }
 
 impl Runnable for &InitCommand {
@@ -216,11 +251,12 @@ impl Runnable for &InitCommand {
         // Prompt for details to put in the config file.
         let keys = self.prompt_for_ssh_keys().unwrap();
         let checks = self.prompt_for_check_commands().unwrap();
+        let shell = self.prompt_for_shell_commands().unwrap();
 
         // Write settings to the config.toml file
         let config = Config {
             commands: Some(Commands {
-                shell: None,
+                shell: shell,
                 start: None,
                 checks: if !checks.is_empty() { Some(checks) } else { None },
             }),
