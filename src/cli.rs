@@ -172,7 +172,7 @@ impl InitCommand {
         Ok(keys)
     }
 
-    fn prompt_for_check_commands(&self) -> InquireResult<BTreeMap<String, String>> {
+    fn prompt_for_check_commands(&self) -> InquireResult<Option<BTreeMap<String, String>>> {
         eprintln!();
         eprintln!("Check commands include anything that should be run as part of CI.");
         eprintln!("By configuring them in the dev tool, you'll be able to use `dev check`");
@@ -183,6 +183,10 @@ impl InitCommand {
             .with_default(true)
             .prompt()?;
 
+        if !more {
+            return Ok(None);
+        }
+
         while more {
             let name = Text::new("Enter the name of this check:").prompt()?;
             let command = Text::new("Enter the command:").prompt()?;
@@ -192,10 +196,10 @@ impl InitCommand {
                 .prompt()?;
         }
 
-        Ok(result)
+        Ok(Some(result))
     }
 
-    fn prompt_for_shell_commands(&self) -> InquireResult<Option<String>> {
+    fn prompt_for_shell_command(&self) -> InquireResult<Option<String>> {
         eprintln!();
         eprintln!("It's common for a project to require extra packages when running");
         eprintln!("locally. These can include library packages managed by your language's");
@@ -204,7 +208,7 @@ impl InitCommand {
         eprintln!("tool will try to put you in an environment when all those packages are");
         eprintln!("available. In order to do this, you'll need to provide a command that");
         eprintln!("will provide those packages for all sub-processes. You can use \"$@\" to");
-        eprintln!("specify the location that your actual command will be substitudted");
+        eprintln!("specify the location that your actual command will be substituted");
         eprintln!("into. For example:");
         eprintln!();
         eprintln!("For entering a nix flake environment:");
@@ -217,7 +221,7 @@ impl InitCommand {
         eprintln!("> nix develop -c -- uv run -- \"$@\"");
         eprintln!();
 
-        let use_shell_command = Confirm::new("Do you want to enter a shell commands?")
+        let use_shell_command = Confirm::new("Do you want to enter a shell command?")
             .with_default(true)
             .prompt()?;
 
@@ -226,6 +230,26 @@ impl InitCommand {
         }
 
         let command = Text::new("Enter the shell command:").prompt()?;
+
+        Ok(Some(command))
+    }
+
+    fn prompt_for_start_command(&self) -> InquireResult<Option<String>> {
+        eprintln!();
+        eprintln!("Most projects, particularly web apps, have a standard command to start");
+	eprintln!("up the app. To make it standard across all project, you can configure");
+	eprintln!("this command to be executed when you run `dev start`.");
+        eprintln!();
+
+        let use_start_command = Confirm::new("Do you want to enter a start command?")
+            .with_default(true)
+            .prompt()?;
+
+        if !use_start_command {
+            return Ok(None);
+        }
+
+        let command = Text::new("Enter the start command:").prompt()?;
 
         Ok(Some(command))
     }
@@ -251,15 +275,12 @@ impl Runnable for &InitCommand {
         // Prompt for details to put in the config file.
         let keys = self.prompt_for_ssh_keys().unwrap();
         let checks = self.prompt_for_check_commands().unwrap();
-        let shell = self.prompt_for_shell_commands().unwrap();
+        let shell = self.prompt_for_shell_command().unwrap();
+        let start = self.prompt_for_start_command().unwrap();
 
         // Write settings to the config.toml file
         let config = Config {
-            commands: Some(Commands {
-                shell: shell,
-                start: None,
-                checks: if !checks.is_empty() { Some(checks) } else { None },
-            }),
+            commands: Some(Commands { shell, start, checks }),
             keys: Some(keys),
         };
         let config = toml::to_string_pretty(&config).unwrap();
