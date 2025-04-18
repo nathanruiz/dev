@@ -281,7 +281,9 @@ impl Runnable for &InitCommand {
         // Write settings to the config.toml file
         let config = Config {
             commands: Some(Commands { shell, start, checks }),
-            keys: Some(keys),
+            keys: Some(BTreeMap::from([
+                ("default".into(), keys),
+            ])),
         };
         let config = toml::to_string_pretty(&config).unwrap();
         std::fs::write(&config_path, config).unwrap();

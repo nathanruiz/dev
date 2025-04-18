@@ -32,7 +32,7 @@ struct Commands {
 #[derive(Deserialize, Serialize)]
 struct Config {
     commands: Option<Commands>,
-    keys: Option<Vec<String>>,
+    keys: Option<BTreeMap<String, Vec<String>>>,
 }
 
 struct Repo {
@@ -121,18 +121,25 @@ impl Environment<'_> {
         Ok(output)
     }
 
-    pub fn encrypt(&self, mut input: &NamedTempFile) -> std::result::Result<(), AgeEncryptError> {
-        let env_path = self.path();
-        let keys = match &self.repo.config.keys {
-            Some(keys) => {
+    pub fn get_keys(&self) -> std::result::Result<Vec<Recipient>, AgeEncryptError> {
+        if let Some(keys) = &self.repo.config.keys {
+            let keys = keys.get(&self.name)
+                .or_else(|| keys.get("default"));
+            if let Some(keys) = keys {
                 let mut result = Vec::with_capacity(keys.len());
                 for key in keys {
                     result.push(Recipient::from_str(key)?);
                 }
-                result
-            },
-            None => Vec::new(),
-        };
+                return Ok(result);
+            }
+        }
+
+        Ok(Vec::new())
+    }
+
+    pub fn encrypt(&self, mut input: &NamedTempFile) -> std::result::Result<(), AgeEncryptError> {
+        let env_path = self.path();
+        let keys = self.get_keys()?;
         let keys = keys.iter().map(|key| key as _);
 
         let encryptor = Encryptor::with_recipients(keys)?;
