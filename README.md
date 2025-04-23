@@ -7,7 +7,7 @@ for common tasks, which *just work:tm:* is any supported repo, such as:
 - Manage encrypted environment variables
 - Run a command in an environment
 - Start up a full webserver in an environment
-- Connect to an environments database (WIP)
+- Connect to an environments database
 
 
 ## What are environments? ##
@@ -133,3 +133,19 @@ dev config export [-e env] [--format <format>]
 ```
 
 Available formats: raw, json, docker.
+
+### Connect to a PostgreSQL database ###
+
+When working on an application that requires a PostgreSQL database, you
+commonly need to run queries on databases across different environments. The
+dev tools makes this easier by allowing you to track these credentials using
+the `DATABASE_URL` environment variable. You can then use the following
+commands to run an interactive psql prompt without needing to manually handle
+database credentials across your team:
+```sh
+# Connect to the local environment's database
+dev psql
+
+# Connect to the dev environment's databse
+dev psql -e dev
+```
