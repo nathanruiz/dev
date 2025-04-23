@@ -401,7 +401,7 @@ impl Runnable for &PsqlCommand {
         args.insert(0, "--");
         args.insert(0, "exec psql \"${DATABASE_URL}\" \"$@\"");
         args.insert(0, "-ce");
-        return environment.exec("bash", args);
+        environment.exec("bash", args)
     }
 }
 
