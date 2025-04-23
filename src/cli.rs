@@ -49,6 +49,8 @@ enum SubCommand {
         #[command(subcommand)]
         command: ConfigCommand,
     },
+    /// Connect to the postgresql server for this environment.
+    Psql(PsqlCommand),
 }
 
 impl Runnable for &SubCommand {
@@ -59,6 +61,7 @@ impl Runnable for &SubCommand {
             SubCommand::Start(cmd) => cmd.run(repo, environment),
             SubCommand::Check(cmd) => cmd.run(repo, environment),
             SubCommand::Init(cmd) => cmd.run(repo, environment),
+            SubCommand::Psql(cmd) => cmd.run(repo, environment),
         }
     }
 }
@@ -380,6 +383,26 @@ enum ConfigExportFormat {
     Raw,
     Json,
     Docker,
+}
+
+// dev psql
+#[derive(Args)]
+struct PsqlCommand {
+    /// Any arguments to be passed into the psql command.
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    args: Vec<String>,
+}
+
+impl Runnable for &PsqlCommand {
+    fn run(self, _repo: &Repo, environment: &Environment<'_>) -> Result<()> {
+        let mut args: Vec<&str> = self.args.iter()
+            .map(String::as_str)
+            .collect();
+        args.insert(0, "--");
+        args.insert(0, "exec psql \"${DATABASE_URL}\" \"$@\"");
+        args.insert(0, "-ce");
+        return environment.exec("bash", args);
+    }
 }
 
 #[cfg(test)]
