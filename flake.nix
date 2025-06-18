@@ -3,6 +3,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     flake-compat = {
       url = "github:edolstra/flake-compat";
       flake = false;
@@ -27,6 +28,15 @@
             bashInteractive
             rust-dev
           ];
+        };
+
+        packages.default = pkgs.rustPlatform.buildRustPackage rec {
+          pname = "dev";
+          version = "0.2.0";
+          src = ./.;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
         };
       });
 }
