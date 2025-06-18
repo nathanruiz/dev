@@ -309,7 +309,9 @@ AAAED75GvIoqmYJAe9EVTIJ1RyG6jQwxp4IaKtOuhyKmQ1lcKcaO+SsZg1StalnVVX+nei
                 repo: Repo {
                     config: Config {
                         commands: None,
-                        keys: Some(vec![PUBLIC_KEY.trim().into()]),
+                        keys: Some([
+                            ("default".into(), vec![PUBLIC_KEY.trim().into()]),
+                        ].into()),
                     },
                     home: path.to_str().unwrap().into(),
                     repo_path: path,
