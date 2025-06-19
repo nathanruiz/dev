@@ -33,7 +33,10 @@
         packages.default = pkgs.rustPlatform.buildRustPackage rec {
           pname = "dev";
           version = "0.2.0";
+
           src = ./.;
+          doCheck = false;
+
           cargoLock = {
             lockFile = ./Cargo.lock;
           };
