@@ -3,7 +3,7 @@
 This tool provides a standard interface to manage [12
 factor](https://12factor.net/) projects, regardless of the language or
 framework used. The main goal is to allow you to run a standard set of commands
-for common tasks, which *just work:tm:* is any supported repo, such as:
+for common tasks, which *just work™* is any supported repo, such as:
 - Manage encrypted environment variables
 - Run a command in an environment
 - Start up a full webserver in an environment
