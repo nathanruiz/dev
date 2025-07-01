@@ -46,6 +46,7 @@ impl From<AgeDecryptError> for AppError {
 #[derive(Debug)]
 pub enum AgeDecryptError {
     Io(std::io::Error),
+    InvalidSshKey(String, std::io::Error),
     Decrypt(age::DecryptError),
 }
 
@@ -53,6 +54,7 @@ impl fmt::Display for AgeDecryptError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Io(e) => write!(f, "{}", e),
+            Self::InvalidSshKey(path, e) => write!(f, "Invalid SSH Key '{}': {}", path, e),
             Self::Decrypt(e) => write!(f, "{}", e),
         }
     }

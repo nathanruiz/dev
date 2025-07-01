@@ -106,7 +106,8 @@ impl Environment<'_> {
         };
 
         let private_key_path = format!("{}/.ssh/id_ed25519", self.repo.home);
-        let private_key = File::open(private_key_path)?;
+        let private_key = File::open(&private_key_path)
+            .map_err(|e| AgeDecryptError::InvalidSshKey(private_key_path, e))?;
         let private_key = BufReader::new(private_key);
         let private_key = Identity::from_buffer(private_key, None)?;
 
