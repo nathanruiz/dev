@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
 use std::iter;
-use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str::FromStr;
@@ -238,7 +237,10 @@ impl Environment<'_> {
             command.env(key, value);
         }
 
-        let err = command.exec();
+        let err = match command.status() {
+            Ok(status) => std::process::exit(status.code().unwrap()),
+            Err(err) => err,
+        };
 
         let mut all_args = vec![path];
         all_args.extend(args);
