@@ -9,6 +9,12 @@ for common tasks, which *just work™* is any supported repo, such as:
 - Start up a full webserver in an environment
 - Connect to an environments database
 
+## Getting Started ##
+
+The `dev` tool can be installed via pip:
+```bash
+pip install dev-rs
+```
 
 ## What are environments? ##
 
